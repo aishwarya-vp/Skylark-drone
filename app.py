@@ -27,7 +27,7 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(
 client = gspread.authorize(creds)
 
 # 🔥 Replace with your Spreadsheet ID
-SPREADSHEET_ID = "YOUR_SPREADSHEET_ID_HERE"
+SPREADSHEET_ID = "1oco8CmRFKnJk4vLgQdxnQ2SqH_RaBdp_78mOnm4cgZU"
 
 sheet = client.open_by_key(SPREADSHEET_ID)
 
