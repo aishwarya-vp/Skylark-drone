@@ -5,25 +5,31 @@ from oauth2client.service_account import ServiceAccountCredentials
 import time
 
 # ---------- PAGE CONFIG ----------
-
 st.set_page_config(
     page_title="Drone Operations Coordinator",
     layout="wide"
 )
 
-# ---------- GOOGLE SHEETS CONNECTION ----------
+# ---------- GOOGLE SHEETS CONNECTION (CLOUD SAFE) ----------
 
 scope = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds = ServiceAccountCredentials.from_json_keyfile_name(
-    "credentials.json", scope)
+# Load credentials from Streamlit Secrets
+creds_dict = st.secrets["gcp_service_account"]
+
+creds = ServiceAccountCredentials.from_json_keyfile_dict(
+    creds_dict, scope
+)
 
 client = gspread.authorize(creds)
 
-sheet = client.open("Skylark-Agent")
+# 🔥 Replace with your Spreadsheet ID
+SPREADSHEET_ID = "YOUR_SPREADSHEET_ID_HERE"
+
+sheet = client.open_by_key(SPREADSHEET_ID)
 
 pilot_sheet = sheet.worksheet("pilot_roster")
 drone_sheet = sheet.worksheet("drone_fleet")
