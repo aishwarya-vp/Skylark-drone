@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import json
 import time
 
 # ---------- PAGE CONFIG ----------
@@ -10,23 +11,23 @@ st.set_page_config(
     layout="wide"
 )
 
-# ---------- GOOGLE SHEETS CONNECTION (CLOUD SAFE) ----------
+# ---------- GOOGLE SHEETS CONNECTION (FINAL CLOUD VERSION) ----------
 
 scope = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
-# Load credentials from Streamlit Secrets
-creds_dict = st.secrets["gcp_service_account"]
+# Load full JSON from Streamlit Secrets
+creds_info = json.loads(st.secrets["gcp_service_account"]["json"])
 
 creds = ServiceAccountCredentials.from_json_keyfile_dict(
-    creds_dict, scope
+    creds_info, scope
 )
 
 client = gspread.authorize(creds)
 
-# 🔥 Replace with your Spreadsheet ID
+# 🔥 Your Spreadsheet ID
 SPREADSHEET_ID = "1oco8CmRFKnJk4vLgQdxnQ2SqH_RaBdp_78mOnm4cgZU"
 
 sheet = client.open_by_key(SPREADSHEET_ID)
@@ -118,6 +119,7 @@ elif section == "Pilot Management":
                 cell = pilot_sheet.find(name)
                 pilot_sheet.update_cell(cell.row, 6, status)
                 st.success("Status updated successfully.")
+                st.rerun()
             except:
                 st.error("Pilot not found.")
 
