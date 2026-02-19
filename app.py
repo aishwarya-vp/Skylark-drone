@@ -19,7 +19,7 @@ scope = [
 ]
 
 # Load full JSON from Streamlit Secrets
-creds_info = json.loads(st.secrets["gcp_service_account"]["json"])
+creds_info = dict(st.secrets["gcp_service_account"])
 
 creds = ServiceAccountCredentials.from_json_keyfile_dict(
     creds_info, scope
