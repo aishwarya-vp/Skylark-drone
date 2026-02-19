@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import json
 import time
 
 # ---------- PAGE CONFIG ----------
@@ -11,14 +10,14 @@ st.set_page_config(
     layout="wide"
 )
 
-# ---------- GOOGLE SHEETS CONNECTION (FINAL CLOUD VERSION) ----------
+# ---------- GOOGLE SHEETS CONNECTION ----------
 
 scope = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
-# Load full JSON from Streamlit Secrets
+# Load credentials from Streamlit Secrets
 creds_info = dict(st.secrets["gcp_service_account"])
 
 creds = ServiceAccountCredentials.from_json_keyfile_dict(
@@ -27,15 +26,20 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(
 
 client = gspread.authorize(creds)
 
-# 🔥 Your Spreadsheet ID
 SPREADSHEET_ID = "1oco8CmRFKnJk4vLgQdxnQ2SqH_RaBdp_78mOnm4cgZU"
 
-sheet = client.open_by_key(SPREADSHEET_ID)
+try:
+    sheet = client.open_by_key(SPREADSHEET_ID)
+except Exception as e:
+    st.error("Permission error. Make sure the Google Sheet is shared with the service account.")
+    st.stop()
 
+# Use EXACT tab names from your sheet
 pilot_sheet = sheet.worksheet("pilot_roster")
 drone_sheet = sheet.worksheet("drone_fleet")
 mission_sheet = sheet.worksheet("missions")
 
+# Load data
 pilots = pd.DataFrame(pilot_sheet.get_all_records())
 drones = pd.DataFrame(drone_sheet.get_all_records())
 missions = pd.DataFrame(mission_sheet.get_all_records())
@@ -85,22 +89,19 @@ elif section == "Pilot Management":
 
     if st.button("Search Pilots"):
 
-        with st.spinner("Processing request..."):
-            time.sleep(1)
+        filtered = pilots[pilots["status"] == "Available"]
 
-            filtered = pilots[pilots["status"] == "Available"]
+        if skill:
+            filtered = filtered[
+                filtered["skills"].str.contains(skill, case=False, na=False)
+            ]
 
-            if skill:
-                filtered = filtered[
-                    filtered["skills"].str.contains(skill, case=False)
-                ]
+        if location:
+            filtered = filtered[
+                filtered["location"].str.contains(location, case=False, na=False)
+            ]
 
-            if location:
-                filtered = filtered[
-                    filtered["location"].str.contains(location, case=False)
-                ]
-
-            st.dataframe(filtered)
+        st.dataframe(filtered)
 
     st.subheader("Update Pilot Status")
 
@@ -112,16 +113,13 @@ elif section == "Pilot Management":
 
     if st.button("Update Status"):
 
-        with st.spinner("Updating status..."):
-            time.sleep(1)
-
-            try:
-                cell = pilot_sheet.find(name)
-                pilot_sheet.update_cell(cell.row, 6, status)
-                st.success("Status updated successfully.")
-                st.rerun()
-            except:
-                st.error("Pilot not found.")
+        try:
+            cell = pilot_sheet.find(name)
+            pilot_sheet.update_cell(cell.row, 6, status)
+            st.success("Status updated successfully.")
+            st.rerun()
+        except:
+            st.error("Pilot not found.")
 
 # =====================================================
 # DRONE INVENTORY
@@ -160,32 +158,29 @@ elif section == "Mission Assignment":
 
     if st.button("Recommend Assignment"):
 
-        with st.spinner("Analyzing mission requirements..."):
-            time.sleep(1)
+        mission = missions[missions["project_id"] == mission_id]
 
-            mission = missions[missions["project_id"] == mission_id]
+        if not mission.empty:
 
-            if not mission.empty:
+            mission = mission.iloc[0]
 
-                mission = mission.iloc[0]
+            available_pilots = pilots[pilots["status"] == "Available"]
 
-                available_pilots = pilots[pilots["status"] == "Available"]
+            matched_pilots = available_pilots[
+                available_pilots["skills"].str.contains(
+                    mission["required_skills"], case=False, na=False)
+            ]
 
-                matched_pilots = available_pilots[
-                    available_pilots["skills"].str.contains(
-                        mission["required_skills"], case=False)
-                ]
+            available_drones = drones[drones["status"] == "Available"]
 
-                available_drones = drones[drones["status"] == "Available"]
+            st.subheader("Recommended Pilots")
+            st.dataframe(matched_pilots)
 
-                st.subheader("Recommended Pilots")
-                st.dataframe(matched_pilots)
+            st.subheader("Available Drones")
+            st.dataframe(available_drones)
 
-                st.subheader("Available Drones")
-                st.dataframe(available_drones)
-
-            else:
-                st.warning("Mission not found.")
+        else:
+            st.warning("Mission not found.")
 
 # =====================================================
 # URGENT REASSIGNMENT
@@ -195,25 +190,20 @@ elif section == "Urgent Reassignment":
 
     st.title("Urgent Reassignment")
 
-    project = st.text_input("Project ID")
-
     if st.button("Find Replacement"):
 
-        with st.spinner("Searching for available resources..."):
-            time.sleep(1)
+        available_pilots = pilots[pilots["status"] == "Available"]
+        available_drones = drones[drones["status"] == "Available"]
 
-            available_pilots = pilots[pilots["status"] == "Available"]
-            available_drones = drones[drones["status"] == "Available"]
+        if available_pilots.empty:
+            st.error("No pilots available.")
 
-            if available_pilots.empty:
-                st.error("No pilots available.")
+        elif available_drones.empty:
+            st.error("No drones available.")
 
-            elif available_drones.empty:
-                st.error("No drones available.")
+        else:
+            st.subheader("Replacement Pilot")
+            st.dataframe(available_pilots.head(1))
 
-            else:
-                st.subheader("Replacement Pilot")
-                st.dataframe(available_pilots.head(1))
-
-                st.subheader("Replacement Drone")
-                st.dataframe(available_drones.head(1))
+            st.subheader("Replacement Drone")
+            st.dataframe(available_drones.head(1))
